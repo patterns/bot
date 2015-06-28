@@ -2,7 +2,9 @@ package main
 
 import (
   "flag"
+  "fmt"
   "log"
+//  "strings"
 
   "github.com/nickvanw/ircx"
   "github.com/sorcix/irc"
@@ -31,7 +33,9 @@ func main() {
 func RegisterHandlers(bot *ircx.Bot) {
   bot.AddCallback(irc.RPL_WELCOME, ircx.Callback{Handler: ircx.HandlerFunc(RegisterConnect)})
   bot.AddCallback(irc.PING, ircx.Callback{Handler: ircx.HandlerFunc(PingHandler)})
-  bot.AddCallback(irc.PRIVMSG, ircx.Callback{Handler: ircx.HandlerFunc(PrivmsgHandler)})
+
+  maildirproxy := &Maildirproxy { Server: *server }
+  bot.AddCallback(irc.PRIVMSG, ircx.Callback{Handler: ircx.HandlerFunc(maildirproxy.PrivmsgHandler)})
 }
 
 func RegisterConnect(s ircx.Sender, m *irc.Message) {
@@ -49,6 +53,17 @@ func PingHandler(s ircx.Sender, m *irc.Message) {
   })
 }
 
-func PrivmsgHandler(s ircx.Sender, m *irc.Message) {
-  log.Println(m.String())
+type Maildirproxy struct {
+  Server string
+}
+
+func (p *Maildirproxy) PrivmsgHandler(s ircx.Sender, m *irc.Message) {
+  cmd := m.Command
+  trl := m.Trailing
+  fmt.Printf("%s (%s) @ %s / ", m.Prefix.Name, m.Prefix.User, m.Prefix.Host)
+  fmt.Printf("%s / ", cmd)
+  fmt.Printf("%s ", m.Params[0])
+  fmt.Printf("%s mdir-%s\n", trl, p.Server)
+
+//  log.Println(m.String())
 }

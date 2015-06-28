@@ -1,13 +1,17 @@
 package main
 
 import (
+  "os/user"
   "flag"
   "fmt"
   "log"
-//  "strings"
+  "path"
+  "regexp"
+  "strings"
 
   "github.com/nickvanw/ircx"
   "github.com/sorcix/irc"
+  "github.com/luksen/maildir"
 )
 
 var (
@@ -34,7 +38,7 @@ func RegisterHandlers(bot *ircx.Bot) {
   bot.AddCallback(irc.RPL_WELCOME, ircx.Callback{Handler: ircx.HandlerFunc(RegisterConnect)})
   bot.AddCallback(irc.PING, ircx.Callback{Handler: ircx.HandlerFunc(PingHandler)})
 
-  maildirproxy := &Maildirproxy { Server: *server }
+  maildirproxy := NewMaildirproxy(*server)
   bot.AddCallback(irc.PRIVMSG, ircx.Callback{Handler: ircx.HandlerFunc(maildirproxy.PrivmsgHandler)})
 }
 
@@ -55,6 +59,43 @@ func PingHandler(s ircx.Sender, m *irc.Message) {
 
 type Maildirproxy struct {
   Server string
+  Mdir maildir.Dir
+}
+
+func Formatservername(name string) string {
+  host := strings.Split(name, ":")
+  reg, err := regexp.Compile("[^A-Za-z0-9]+")
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  safe := reg.ReplaceAllString(host[0], "")
+  safe = "." + strings.ToLower(strings.Trim(safe, " "))
+
+  usr, err := user.Current()
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  full := path.Join(usr.HomeDir, safe)
+  return full
+}
+
+func NewMaildirproxy(srv string) *Maildirproxy {
+  normname := Formatservername(srv)
+  var d maildir.Dir = maildir.Dir(normname)
+
+  fmt.Printf("creating maildir (%s) \n", normname)
+  err := d.Create()
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  m := &Maildirproxy {
+    Server: srv,
+    Mdir: d,
+  }
+  return m
 }
 
 func (p *Maildirproxy) PrivmsgHandler(s ircx.Sender, m *irc.Message) {

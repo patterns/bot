@@ -1,6 +1,7 @@
 package main
 
 import (
+  "os"
   "os/user"
   "flag"
   "fmt"
@@ -81,14 +82,27 @@ func Formatservername(name string) string {
   return full
 }
 
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	panic(err)
+}
+
 func NewMaildirproxy(srv string) *Maildirproxy {
   normname := Formatservername(srv)
   var d maildir.Dir = maildir.Dir(normname)
 
-  fmt.Printf("creating maildir (%s) \n", normname)
-  err := d.Create()
-  if err != nil {
-    log.Fatal(err)
+  if !exists(normname) {
+    fmt.Printf("creating maildir (%s) \n", normname)
+    err := d.Create()
+    if err != nil {
+      log.Fatal(err)
+    }
   }
 
   m := &Maildirproxy {
@@ -106,5 +120,22 @@ func (p *Maildirproxy) PrivmsgHandler(s ircx.Sender, m *irc.Message) {
   fmt.Printf("%s ", m.Params[0])
   fmt.Printf("%s mdir-%s\n", trl, p.Server)
 
-//  log.Println(m.String())
+  msg := "From: outsider <"+ m.Prefix.User + "@" + m.Prefix.Host + ">\nTo: local dude <dude@localhost>" + "\nSubject: " + m.Params[0] + "\nDate: Fri, 21 Nov 1997 09:55:06 -0600" + "\nMessage-ID: <1234@localhost>"+ "\n\n" + trl + "\n"
+  log.Println("debug>>" + msg)
+
+  dlv, err := p.Mdir.NewDelivery()
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  _, err = dlv.Write([]byte(msg))
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  err = dlv.Close()
+  if err != nil {
+    log.Fatal(err)
+  }
+
 }

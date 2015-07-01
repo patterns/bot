@@ -3,12 +3,15 @@ package main
 import (
   "os"
   "os/user"
+  "crypto/md5"
+  "encoding/hex"
   "flag"
   "fmt"
   "log"
   "path"
   "regexp"
   "strings"
+  "time"
 
   "github.com/nickvanw/ircx"
   "github.com/sorcix/irc"
@@ -113,15 +116,13 @@ func NewMaildirproxy(srv string) *Maildirproxy {
 }
 
 func (p *Maildirproxy) PrivmsgHandler(s ircx.Sender, m *irc.Message) {
-  cmd := m.Command
-  trl := m.Trailing
-  fmt.Printf("%s (%s) @ %s / ", m.Prefix.Name, m.Prefix.User, m.Prefix.Host)
-  fmt.Printf("%s / ", cmd)
-  fmt.Printf("%s ", m.Params[0])
-  fmt.Printf("%s mdir-%s\n", trl, p.Server)
 
-  msg := "From: outsider <"+ m.Prefix.User + "@" + m.Prefix.Host + ">\nTo: local dude <dude@localhost>" + "\nSubject: " + m.Params[0] + "\nDate: Fri, 21 Nov 1997 09:55:06 -0600" + "\nMessage-ID: <1234@localhost>"+ "\n\n" + trl + "\n"
-  log.Println("debug>>" + msg)
+  msghd := "From: " + m.Prefix.Name + " <"+ m.Prefix.User + "@" + m.Prefix.Host + ">\nTo: <listserv@localhost>\nSubject: " + m.Params[0] + "\nDate: " + time.Now().UTC().Format(time.RFC1123Z)
+  data := []byte(msghd + m.Trailing)
+  sum := md5.Sum(data)
+  msgid := "\nMessage-ID: " + hex.EncodeToString(sum[:])
+
+  msg := msghd + msgid + "\n\n" + m.Trailing + "\n"
 
   dlv, err := p.Mdir.NewDelivery()
   if err != nil {
